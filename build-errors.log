@@ -1,0 +1,37 @@
+
+> aetheria-web@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.2.1 (Turbopack)
+- Environments: .env.local
+
+ΓÜá The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 9.5s
+  Running TypeScript ...
+  Finished TypeScript in 24.3s ...
+  Collecting page data using 12 workers ...
+  Generating static pages using 12 workers (0/10) ...
+  Generating static pages using 12 workers (2/10) 
+  Generating static pages using 12 workers (4/10) 
+  Generating static pages using 12 workers (7/10) 
+Γ£ô Generating static pages using 12 workers (10/10) in 1456ms
+  Finalizing page optimization ...
+
+Route (app)           Revalidate  Expire
+Γöî Γùï /                         1h      1y
+Γö£ Γùï /_not-found
+Γö£ Γùï /admin/login
+Γö£ ╞Æ /api/upload
+Γö£ Γùï /discover
+Γö£ Γùï /discovery                1h      1y
+Γö£ ╞Æ /movie/[id]
+Γö£ Γùï /profiles
+Γöö Γùï /upload
+
+
+╞Æ Proxy (Middleware)
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+
