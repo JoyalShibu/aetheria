@@ -5,13 +5,13 @@ import { Float, Html, ContactShadows, Environment, Stars } from '@react-three/dr
 import { useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Profile, useProfile, MOCK_PROFILES } from './ProfileProvider';
-import { useRouter } from 'next/navigation';
 
 function ProfileSphere({ profile, position, index }: { profile: Profile; position: [number, number, number], index: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  const { setActiveProfile } = useProfile();
-  const router = useRouter();
+  const { activeProfile, setActiveProfile } = useProfile();
+  
+  const isActive = activeProfile?.id === profile.id;
 
   useFrame((state) => {
     if (!meshRef.current) return;
@@ -25,7 +25,6 @@ function ProfileSphere({ profile, position, index }: { profile: Profile; positio
 
   const handleClick = () => {
     setActiveProfile(profile);
-    router.push('/');
   };
 
   return (
@@ -36,21 +35,21 @@ function ProfileSphere({ profile, position, index }: { profile: Profile; positio
           onPointerOver={() => setHovered(true)}
           onPointerOut={() => setHovered(false)}
           onClick={handleClick}
-          scale={hovered ? 1.2 : 1}
+          scale={hovered || isActive ? 1.2 : 1}
         >
           <sphereGeometry args={[1, 64, 64]} />
           <meshStandardMaterial 
             color={profile.color} 
             emissive={profile.color}
-            emissiveIntensity={hovered ? 2 : 0.8}
+            emissiveIntensity={hovered || isActive ? 2 : 0.8}
             roughness={0.2}
             metalness={0.8}
-            wireframe={hovered}
+            wireframe={hovered || isActive}
           />
         </mesh>
       </Float>
 
-      <Html position={[0, -1.8, 0]} center transform style={{ transition: 'all 0.3s', opacity: hovered ? 1 : 0.7, transform: 'scale(' + (hovered ? 1.2 : 1) + ')' }}>
+      <Html position={[0, -1.8, 0]} center transform style={{ transition: 'all 0.3s', opacity: hovered || isActive ? 1 : 0.7, transform: 'scale(' + (hovered || isActive ? 1.2 : 1) + ')' }}>
         <div className="flex flex-col items-center pointer-events-none">
           <h2 className="text-xl font-black uppercase tracking-widest text-white drop-shadow-[0_0_10px_currentColor]" style={{ color: profile.color }}>
             {profile.name}
