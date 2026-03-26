@@ -4,7 +4,8 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { Float, Html, ContactShadows, Environment, Stars } from '@react-three/drei';
 import { useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Profile, useProfile, MOCK_PROFILES } from './ProfileProvider';
+import { Profile, useProfile } from './ProfileProvider';
+import { useRouter } from 'next/navigation';
 
 function ProfileSphere({ profile, position, index }: { profile: Profile; position: [number, number, number], index: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -12,6 +13,8 @@ function ProfileSphere({ profile, position, index }: { profile: Profile; positio
   const { activeProfile, setActiveProfile } = useProfile();
   
   const isActive = activeProfile?.id === profile.id;
+
+  const router = useRouter();
 
   useFrame((state) => {
     if (!meshRef.current) return;
@@ -25,6 +28,7 @@ function ProfileSphere({ profile, position, index }: { profile: Profile; positio
 
   const handleClick = () => {
     setActiveProfile(profile);
+    router.push('/');
   };
 
   return (
@@ -61,6 +65,12 @@ function ProfileSphere({ profile, position, index }: { profile: Profile; positio
 }
 
 export default function AvatarOrbit() {
+  const { profiles } = useProfile();
+
+  if (!profiles || profiles.length === 0) {
+    return null; // Or a loading spinner if preferred, but Provider handles loading
+  }
+
   return (
     <div className="w-full h-[60vh] md:h-[70vh] cursor-crosshair">
       <Canvas camera={{ position: [0, 0, 8], fov: 45 }}>
@@ -72,10 +82,10 @@ export default function AvatarOrbit() {
         <Environment preset="night" />
 
         <group position={[0, 0.5, 0]}>
-          {MOCK_PROFILES.map((profile, i) => {
+          {profiles.map((profile, i) => {
             // Distribute them evenly in an arc
             const spacing = 3;
-            const offset = (MOCK_PROFILES.length - 1) * spacing / 2;
+            const offset = (profiles.length - 1) * spacing / 2;
             const x = (i * spacing) - offset;
             // Arc curve: middle is higher/forward
             const z = Math.abs(x) * 0.5;

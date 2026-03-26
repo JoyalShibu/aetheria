@@ -4,26 +4,41 @@ import { updateSession } from '@/utils/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
   // Update Supabase Auth session first
-  let response = await updateSession(request)
+  let { supabaseResponse: response, user } = await updateSession(request)
 
   const pathname = request.nextUrl.pathname;
-  const isPublicRoute = pathname === '/profiles' || pathname.startsWith('/admin');
+  
+  const isLoginRoute = pathname === '/login';
+  const isProfilesRoute = pathname === '/profiles';
+  const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/upload');
+  const isAdminLoginRoute = pathname === '/admin/login';
 
-  // Must select frequency/profile before accessing any other routes (including root and /login)
-  if (!isPublicRoute) {
-    const profileCookie = request.cookies.get('aetheria_profile')?.value;
-    if (!profileCookie) {
-      return NextResponse.redirect(new URL('/profiles', request.url));
-    }
+  // 1. Unauthenticated users can only access login and admin login
+  if (!user && !isLoginRoute && !isAdminLoginRoute) {
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  const isRouteAdmin = request.nextUrl.pathname.startsWith('/admin') || request.nextUrl.pathname.startsWith('/upload')
-  const isRouteAdminLogin = request.nextUrl.pathname.startsWith('/admin/login')
-
-  if (isRouteAdmin && !isRouteAdminLogin) {
+  // 2. Admin routes protection
+  if (isAdminRoute && !isAdminLoginRoute) {
     const token = request.cookies.get('aetheria_admin_token')?.value
     if (!token) {
       return NextResponse.redirect(new URL('/admin/login', request.url))
+    }
+  }
+
+  // 3. User is authenticated
+  if (user) {
+    if (isLoginRoute) {
+      // Redirect away from login if already authenticated
+      return NextResponse.redirect(new URL('/profiles', request.url));
+    }
+
+    // Must select a profile before accessing main content
+    if (!isProfilesRoute && !isAdminRoute) {
+      const profileCookie = request.cookies.get('aetheria_profile')?.value;
+      if (!profileCookie) {
+        return NextResponse.redirect(new URL('/profiles', request.url));
+      }
     }
   }
 

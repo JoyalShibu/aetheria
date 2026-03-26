@@ -1,10 +1,8 @@
 'use client';
 
 import AvatarOrbit from '@/components/AvatarOrbit';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useProfile } from '@/components/ProfileProvider';
-import Link from 'next/link';
-import { User, ArrowRight } from 'lucide-react';
 
 export default function ProfilesPage() {
   const { activeProfile } = useProfile();
@@ -38,33 +36,6 @@ export default function ProfilesPage() {
         <AvatarOrbit />
       </motion.div>
 
-      <AnimatePresence>
-        {activeProfile && (
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 30 }}
-            className="absolute bottom-12 left-0 right-0 flex flex-col md:flex-row justify-center items-center gap-4 md:gap-8 z-50 pointer-events-auto"
-          >
-            <Link href="/">
-              <button className="flex items-center gap-3 bg-white/5 hover:bg-white/10 backdrop-blur-md px-8 py-4 rounded-full border border-white/20 hover:border-white/40 shadow-lg hover:shadow-[0_0_20px_rgba(0,229,255,0.2)] transition-all text-white/90 group">
-                <span className="text-sm uppercase tracking-[0.2em] font-bold">Enter Matrix</span>
-                <ArrowRight size={18} className="text-neon-cyan group-hover:translate-x-1 transition-transform" />
-              </button>
-            </Link>
-
-            <Link href="/login">
-              <button 
-                className="flex items-center gap-3 bg-neon-pink/20 hover:bg-neon-pink/40 backdrop-blur-md px-8 py-4 rounded-full border border-neon-pink/50 shadow-[0_0_20px_rgba(255,100,255,0.3)] hover:shadow-[0_0_30px_rgba(255,100,255,0.6)] transition-all text-white group"
-                style={{ borderColor: activeProfile.color, boxShadow: `0 0 20px ${activeProfile.color}40` }}
-              >
-                <User size={18} className="text-white group-hover:scale-110 transition-transform" />
-                <span className="text-sm uppercase tracking-[0.2em] font-bold">Sign In</span>
-              </button>
-            </Link>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </main>
   );
 }

@@ -38,5 +38,5 @@ export async function updateSession(request: NextRequest) {
   // Note: We can add route protection logic here if needed.
   // For now, we simply update the session cookie.
   
-  return supabaseResponse
+  return { supabaseResponse, user }
 }
