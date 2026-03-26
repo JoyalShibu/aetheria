@@ -6,6 +6,17 @@ export async function middleware(request: NextRequest) {
   // Update Supabase Auth session first
   let response = await updateSession(request)
 
+  const pathname = request.nextUrl.pathname;
+  const isPublicRoute = pathname === '/profiles' || pathname.startsWith('/admin');
+
+  // Must select frequency/profile before accessing any other routes (including root and /login)
+  if (!isPublicRoute) {
+    const profileCookie = request.cookies.get('aetheria_profile')?.value;
+    if (!profileCookie) {
+      return NextResponse.redirect(new URL('/profiles', request.url));
+    }
+  }
+
   const isRouteAdmin = request.nextUrl.pathname.startsWith('/admin') || request.nextUrl.pathname.startsWith('/upload')
   const isRouteAdminLogin = request.nextUrl.pathname.startsWith('/admin/login')
 

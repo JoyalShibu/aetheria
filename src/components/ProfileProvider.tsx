@@ -31,10 +31,14 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Rehydrate on mount
-    const stored = localStorage.getItem('aetheria_profile');
+    const stored = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('aetheria_profile='))
+      ?.split('=')[1];
+      
     if (stored) {
       try {
-        setActiveProfileState(JSON.parse(stored));
+        setActiveProfileState(JSON.parse(decodeURIComponent(stored)));
       } catch (e) {
         // ignore
       }
@@ -45,9 +49,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const setActiveProfile = (profile: Profile | null) => {
     setActiveProfileState(profile);
     if (profile) {
-      localStorage.setItem('aetheria_profile', JSON.stringify(profile));
+      document.cookie = `aetheria_profile=${encodeURIComponent(JSON.stringify(profile))}; path=/; max-age=31536000`; // 1 year expiry
     } else {
-      localStorage.removeItem('aetheria_profile');
+      document.cookie = 'aetheria_profile=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     }
   };
 
