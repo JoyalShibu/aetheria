@@ -53,9 +53,13 @@ export default function MovieDiorama({ movie }: { movie: Movie }) {
 
       const initPlayer = () => {
         if (!movie.trailerKey) return;
-        const videoId = movie.trailerKey.includes('youtu')  
-          ? movie.trailerKey.split(/youtu\.be\/|v=/)[1]?.split(/[?&]/)[0]
-          : movie.trailerKey;
+        let videoId = movie.trailerKey;
+        if (movie.trailerKey.includes('youtu')) {
+          const match = movie.trailerKey.match(/(?:v=|\/embed\/|\.be\/)([^&?]+)/);
+          if (match && match[1]) {
+            videoId = match[1];
+          }
+        }
 
         ytRef.current = new window.YT.Player('native-yt-player', {
           videoId,
