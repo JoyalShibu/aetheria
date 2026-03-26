@@ -1,13 +1,11 @@
 'use server';
 
-import fs from 'fs/promises';
-import path from 'path';
 import { Movie } from '@/lib/tmdb';
 import { revalidatePath } from 'next/cache';
+import { createClient } from '@/utils/supabase/server';
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
-const dataFilePath = path.join(process.cwd(), 'data', 'custom_movies.json');
 
 async function hydrateFromTMDB(id: string | null, title: string) {
   const apiKey = process.env.TMDB_API_KEY;
@@ -39,7 +37,6 @@ async function hydrateFromTMDB(id: string | null, title: string) {
     }
   }
   
-  // Fallbacks if absolutely nothing found
   if (!poster) poster = 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=400';
   if (!backdrop) backdrop = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=1200';
   
@@ -48,18 +45,13 @@ async function hydrateFromTMDB(id: string | null, title: string) {
 
 export async function addCustomMovie(formData: FormData) {
   try {
-    const fileContent = await fs.readFile(dataFilePath, 'utf-8').catch(() => '[]');
-    let movies: Movie[] = [];
-    try {
-      movies = JSON.parse(fileContent);
-    } catch {
-      movies = [];
-    }
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
     const title = formData.get('title') as string || 'Untitled';
     const { poster, backdrop, fallbackSynopsis, fallbackYear } = await hydrateFromTMDB(null, title);
 
-    const newMovie: Movie = {
+    const newMovie = {
       id: 'custom_' + Date.now().toString(),
       title: title,
       poster: poster,
@@ -68,17 +60,14 @@ export async function addCustomMovie(formData: FormData) {
       year: formData.get('year') as string || fallbackYear || 'N/A',
       synopsis: formData.get('synopsis') as string || fallbackSynopsis || 'No synopsis provided.',
       language: formData.get('language') as string || 'ml',
-      cast: [],
-      trailerKey: formData.get('trailerKey') as string || ''
+      trailerKey: formData.get('trailerKey') as string || '',
+      user_id: user?.id || null 
     };
 
-    movies.unshift(newMovie); // Add to the absolute front
-    
-    await fs.writeFile(dataFilePath, JSON.stringify(movies, null, 2));
+    const { error } = await supabase.from('movies').insert(newMovie);
+    if (error) throw error;
 
-    // Instantly invalidate the home page cache so the orbit updates automatically without a hard refresh
     revalidatePath('/');
-    
     return { success: true };
   } catch (error) {
     console.error("Failed to add custom movie:", error);
@@ -88,8 +77,36 @@ export async function addCustomMovie(formData: FormData) {
 
 export async function getCustomMovies(): Promise<Movie[]> {
   try {
-    const fileContent = await fs.readFile(dataFilePath, 'utf-8').catch(() => '[]');
-    return JSON.parse(fileContent);
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    let query = supabase.from('movies').select('*');
+    
+    if (user) {
+      // Show global movies (user_id is null) AND user's personal movies
+      query = query.or(`user_id.is.null,user_id.eq.${user.id}`);
+    } else {
+      // Show only global movies
+      query = query.is('user_id', null);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+      
+    if (error || !data) return [];
+    
+    // Map DB rows to Movie interface format
+    return data.map(row => ({
+      id: row.id,
+      title: row.title,
+      poster: row.poster,
+      backdrop: row.backdrop,
+      director: row.director,
+      year: row.year,
+      synopsis: row.synopsis,
+      language: row.language,
+      trailerKey: row.trailerKey,
+      cast: [] // Mocked for custom videos
+    }));
   } catch {
     return [];
   }
@@ -97,9 +114,10 @@ export async function getCustomMovies(): Promise<Movie[]> {
 
 export async function getHiddenMovieIds(): Promise<string[]> {
   try {
-    const hiddenFilePath = path.join(process.cwd(), 'data', 'hidden_movies.json');
-    const fileContent = await fs.readFile(hiddenFilePath, 'utf-8').catch(() => '[]');
-    return JSON.parse(fileContent);
+    const supabase = await createClient();
+    const { data, error } = await supabase.from('hidden_movies').select('movie_id');
+    if (error || !data) return [];
+    return data.map(row => row.movie_id);
   } catch {
     return [];
   }
@@ -107,38 +125,21 @@ export async function getHiddenMovieIds(): Promise<string[]> {
 
 export async function deleteCustomMovie(id: string) {
   try {
-    const fileContent = await fs.readFile(dataFilePath, 'utf-8').catch(() => '[]');
-    let movies: Movie[] = JSON.parse(fileContent);
+    const supabase = await createClient();
     
-    const movieToDelete = movies.find(m => m.id === id);
-    if (movieToDelete) {
-      if (movieToDelete.trailerKey?.startsWith('/uploads/')) {
-        const filePath = path.join(process.cwd(), 'public', movieToDelete.trailerKey);
-        try {
-          await fs.unlink(filePath);
-          console.log(`Physically deleted movie file: ${filePath}`);
-        } catch (e) {
-          console.error(`Failed to physically delete file ${filePath}:`, e);
-        }
-      }
-
-      movies = movies.filter(m => m.id !== id);
-      await fs.writeFile(dataFilePath, JSON.stringify(movies, null, 2));
-    } else {
-      // It's a Global TMDB / Mock movie. Hide it.
-      const hiddenFilePath = path.join(process.cwd(), 'data', 'hidden_movies.json');
-      const hiddenContent = await fs.readFile(hiddenFilePath, 'utf-8').catch(() => '[]');
-      let hidden: string[] = JSON.parse(hiddenContent);
-      if (!hidden.includes(id)) {
-        hidden.push(id);
-        await fs.writeFile(hiddenFilePath, JSON.stringify(hidden, null, 2));
-      }
+    // Attempt to delete from custom movies
+    const { error } = await supabase.from('movies').delete().eq('id', id);
+    
+    if (error) {
+      // If it wasn't a custom movie, it might be a global TMDB movie that needs hiding
+      const { error: hiddenError } = await supabase.from('hidden_movies').insert([{ movie_id: id }]);
+      if (hiddenError) throw hiddenError;
     }
     
     revalidatePath('/');
     return { success: true };
   } catch (error) {
-    console.error("Failed to delete movie:", error);
+    console.error("Failed to delete/hide movie:", error);
     return { success: false };
   }
 }
@@ -148,16 +149,15 @@ export async function updateCustomMovie(formData: FormData) {
     const id = formData.get('id') as string;
     if (!id) return { success: false, error: 'No ID provided' };
 
-    const fileContent = await fs.readFile(dataFilePath, 'utf-8').catch(() => '[]');
-    let movies: Movie[] = JSON.parse(fileContent);
-    const movieIndex = movies.findIndex(m => m.id === id);
+    const supabase = await createClient();
+    const { data: existingMovie } = await supabase.from('movies').select('*').eq('id', id).single();
     
-    if (movieIndex === -1) {
-      // The user is editing a Global / TMDB movie. Create a JSON override clone!
+    if (!existingMovie) {
+      // Not in DB -> it's a TMDB movie override
       const title = (formData.get('title') as string) || 'Untitled';
       const { poster, backdrop, fallbackSynopsis, fallbackYear } = await hydrateFromTMDB(id, title);
 
-      const overrideMovie: Movie = {
+      const overrideMovie = {
         id: id,
         title: title,
         poster: poster,
@@ -166,38 +166,28 @@ export async function updateCustomMovie(formData: FormData) {
         year: (formData.get('year') as string) || fallbackYear || 'N/A',
         synopsis: (formData.get('synopsis') as string) || fallbackSynopsis || '',
         language: (formData.get('language') as string) || 'ml',
-        cast: [], // Simplification for overrides,
         trailerKey: (formData.get('trailerKey') as string) || ''
       };
-      movies.unshift(overrideMovie);
+      await supabase.from('movies').insert(overrideMovie);
     } else {
-      // Update existing custom movie fields conditionally
+      // Update existing
+      const updates: any = {};
       const title = formData.get('title') as string;
-      if (title) movies[movieIndex].title = title;
+      if (title) updates.title = title;
       
-      const { poster, backdrop } = await hydrateFromTMDB(null, title || movies[movieIndex].title);
-      if (poster && !poster.includes('unsplash')) movies[movieIndex].poster = poster;
-      if (backdrop && !backdrop.includes('unsplash')) movies[movieIndex].backdrop = backdrop;
+      const { poster, backdrop } = await hydrateFromTMDB(null, title || existingMovie.title);
+      if (poster && !poster.includes('unsplash')) updates.poster = poster;
+      if (backdrop && !backdrop.includes('unsplash')) updates.backdrop = backdrop;
       
-      const director = formData.get('director') as string;
-      if (director) movies[movieIndex].director = director;
-      
-      const year = formData.get('year') as string;
-      if (year) movies[movieIndex].year = year;
-      
-      const synopsis = formData.get('synopsis') as string;
-      if (synopsis) movies[movieIndex].synopsis = synopsis;
-      
-      const language = formData.get('language') as string;
-      if (language) movies[movieIndex].language = language;
+      Array.from(['director', 'year', 'synopsis', 'language', 'trailerKey']).forEach(key => {
+        const val = formData.get(key) as string;
+        if (val) updates[key] = val;
+      });
 
-      let finalTrailerKey = formData.get('trailerKey') as string;
-      if (finalTrailerKey) movies[movieIndex].trailerKey = finalTrailerKey;
+      await supabase.from('movies').update(updates).eq('id', id);
     }
 
-    await fs.writeFile(dataFilePath, JSON.stringify(movies, null, 2));
     revalidatePath('/');
-    
     return { success: true };
   } catch (error) {
     console.error("Failed to update custom movie:", error);
