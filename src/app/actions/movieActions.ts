@@ -67,7 +67,7 @@ export async function addCustomMovie(formData: FormData) {
     const { error } = await supabase.from('movies').insert(newMovie);
     if (error) throw error;
 
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true };
   } catch (error) {
     console.error("Failed to add custom movie:", error);
@@ -136,7 +136,7 @@ export async function deleteCustomMovie(id: string) {
       if (hiddenError) throw hiddenError;
     }
     
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true };
   } catch (error) {
     console.error("Failed to delete/hide movie:", error);
@@ -187,7 +187,7 @@ export async function updateCustomMovie(formData: FormData) {
       await supabase.from('movies').update(updates).eq('id', id);
     }
 
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true };
   } catch (error) {
     console.error("Failed to update custom movie:", error);
